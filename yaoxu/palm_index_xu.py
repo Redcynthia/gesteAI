@@ -7,11 +7,14 @@
 ################################################################################
 import os, sys, inspect, thread, time
 import numpy as np
+import mido
+import time
+import rtmidi
 src_dir = os.path.dirname(inspect.getfile(inspect.currentframe()))
 # Windows and Linux
 #arch_dir = '../lib/x64' if sys.maxsize > 2**32 else '../lib/x86'
 # Mac
-arch_dir = os.path.abspath(os.path.join(src_dir, '../LeapSDK/lib'))
+arch_dir = os.path.abspath(os.path.join(src_dir, '../../LeapSDK/lib'))
 
 sys.path.insert(0, os.path.abspath(os.path.join(src_dir, arch_dir)))
 
@@ -35,8 +38,8 @@ class SampleListener(Leap.Listener):
         self.first_timestamp = self.first_frame.timestamp
         self.note_num = 0
 
-        self.pattern = midi.Pattern()
-        self.track = midi.Track()
+        self.midiout = rtmidi.MidiOut()
+        self.midiout.open_virtual_port("To Ableton")
 
         # Enable gestures
         controller.enable_gesture(Leap.Gesture.TYPE_CIRCLE);
@@ -62,28 +65,45 @@ class SampleListener(Leap.Listener):
         #      frame.id, frame.timestamp, len(frame.hands), len(frame.fingers), len(frame.tools), len(frame.gestures()))
 
         # direction of index finger
-        direction_1 = frame.hands.rightmost.fingers[1].bone(2).direction
-        direction_2 = last_frame.hands.rightmost.fingers[1].bone(2).direction
-        direction_3 = back_frame.hands.rightmost.fingers[1].bone(2).direction
+        index_1 = frame.hands.rightmost.fingers[1].bone(2).direction
+        index_2 = last_frame.hands.rightmost.fingers[1].bone(2).direction
+        index_3 = back_frame.hands.rightmost.fingers[1].bone(2).direction
+
+        index_y_1 = frame.hands.rightmost.fingers[1].bone(0).center.y
+        index_y_2 = last_frame.hands.rightmost.fingers[1].bone(0).center.y
+        index_y_3 = back_frame.hands.rightmost.fingers[1].bone(0).center.y
 
         middle_1 = frame.hands.rightmost.fingers[2].bone(2).direction
         middle_2 = last_frame.hands.rightmost.fingers[2].bone(2).direction
         middle_3 = back_frame.hands.rightmost.fingers[2].bone(2).direction
 
-        # angle of these two finger vector
-        if (direction_1).angle_to(direction_2)>np.pi/9 and (direction_1).angle_to(direction_3)<np.pi/15:
-            print "index finger press action, direction vector: ", direction_1, direction_2, direction_3
-            # tick of midi is milli second 1e-3second, timestamp of frame is micro second 1e-6second
-            #start_ = int((frame.timestamp - self.first_timestamp)/ 1000.0)
-            self.track.append(midi.NoteOnEvent(tick=50, velocity=50, pitch=midi.G_3))
-            self.track.append(midi.NoteOffEvent(tick=150, velocity=50, pitch=midi.G_3))
+        middle_y_1 = frame.hands.rightmost.fingers[2].bone(0).center.y
+        middle_y_2 = last_frame.hands.rightmost.fingers[2].bone(0).center.y
+        middle_y_3 = back_frame.hands.rightmost.fingers[2].bone(0).center.y
 
-        if (middle_1).angle_to(middle_2)>np.pi/10 and (middle_1).angle_to(middle_3)<np.pi/15:
-            print "index finger press action, direction vector: ", middle_1, middle_2, middle_3
+        # angle of these two finger vector
+        if (index_1).angle_to(index_2)>np.pi/9 and (index_1).angle_to(index_3)<np.pi/15 and index_y_2 < index_y_3 and index_y_2 < index_y_1:
+            print "index finger press action, direction vector: ", index_1, index_2, index_3
             # tick of midi is milli second 1e-3second, timestamp of frame is micro second 1e-6second
             #start_ = int((frame.timestamp - self.first_timestamp)/ 1000.0)
-            self.track.append(midi.NoteOnEvent(tick=50, velocity=50, pitch=midi.A_3))
-            self.track.append(midi.NoteOffEvent(tick=150, velocity=50, pitch=midi.A_3))
+            #self.track.append(midi.NoteOnEvent(tick=50, velocity=50, pitch=midi.G_3))
+            #self.track.append(midi.NoteOffEvent(tick=150, velocity=50, pitch=midi.G_3))
+            note_on = [0x90, 60, 50] # channel 1, middle C, velocity 112
+            note_off = [0x80, 60, 0]
+            self.midiout.send_message(note_on)
+            time.sleep(0.5)
+            self.midiout.send_message(note_off)
+
+
+        if (middle_1).angle_to(middle_2)>np.pi/10 and (middle_1).angle_to(middle_3)<np.pi/15 and middle_y_2 < middle_y_3 and middle_y_2 < middle_y_1:
+            print "middle finger press action, direction vector: ", middle_1, middle_2, middle_3
+            # tick of midi is milli second 1e-3second, timestamp of frame is micro second 1e-6second
+            #start_ = int((frame.timestamp - self.first_timestamp)/ 1000.0)
+            note_on = [0x90, 90, 50] # channel 1, middle C, velocity 112
+            note_off = [0x80, 90, 0]
+            self.midiout.send_message(note_on)
+            time.sleep(0.5)
+            self.midiout.send_message(note_off)
 
         # get the normal vector of the palm
         normal = frame.hands.rightmost.palm_normal
@@ -93,13 +113,15 @@ class SampleListener(Leap.Listener):
 
         # stop is the palm normal is inversed
         if previous_normal[2] * normal[2] < 0:
-            # end the track, add it to the pattern
-            print "end track event, track adds to pattern"
-            self.track.append(midi.EndOfTrackEvent(tick=1))
-            self.pattern.append(self.track)
-            # write pattern to file midi
-            print "write pattern to file: "
-            midi.write_midifile("example.mid", self.pattern)
+            # end the track, add it to the midiout
+            print "end track event, track adds to midiout"
+            #self.track.append(midi.EndOfTrackEvent(tick=1))
+            #self.midiout.append(self.track)
+            # write midiout to file midi
+            print "write midiout to file: "
+            #outport = mido.open_output('To Ableton')
+            #outport.send(self.midiout)
+            #midi.write_midifile("example.mid", self.midiout)
 
             # stop the listener
             print "stop"
