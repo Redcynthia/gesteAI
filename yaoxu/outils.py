@@ -16,10 +16,12 @@ notes_dic = {'C':0, 'C#':1, 'D':2, 'D#':3, \
                 'G#':8, 'A':9, 'A#':10, 'B':11}
 
 pitchs_dic = {'left4':'C', 'left3':'D', 'left2':'E', 'left1':'F', 'left0':'F#', \
-                'right0':'E', 'right1':'F', 'right2':'G', 'right3':'A', 'right4':'B'}
+                'right0':'G', 'right1':'G#', 'right2':'A', 'right3':'A#', 'right4':'B'}
 
-finger_dist_to_palm = [0.5, 1.5, 0.7, 0.9, 1]
-finger_y_flex = [2, 3, 1, 2, 3]
+fingers = ['thumb','index','middle','ring','picky']
+
+finger_dist_to_palm = [1, 1.5, 1, 0.9, 1]
+finger_y_flex = [2, 3, 3, 4, 3]
 
 
 def create_note(midiout, pitch, sleep_time, velocity):
@@ -66,11 +68,12 @@ def on_play(midiout, frames, hand, finger_num, octave=5):
         #and index_5.y - index_2.y > finger_y_flex[finger_num] \
         #and distance_to_palm_5 - distance_to_palm_2 > finger_dist_to_palm[finger_num] \
         #and index_1.y < 60 \
-
+    coeff = 2 #finger flex
+    if hand == 'left': coeff = 2
     if finger_num == 0: distance_to_palm_2, distance_to_palm_5 = distance_to_palm_5, distance_to_palm_2
     if (index_1.y - index_2.y) * (index_2.y-index_3.y)<0 \
-        and index_5.y - index_2.y > finger_y_flex[finger_num] \
-        and index_1.y < 60:
+        and index_5.y - index_2.y > coeff*finger_y_flex[finger_num] \
+        and distance_to_palm_5 - distance_to_palm_2 > finger_dist_to_palm[finger_num]:
         
 
         
@@ -81,12 +84,11 @@ def on_play(midiout, frames, hand, finger_num, octave=5):
         if octave > 11: octave = 11
         if octave < 0: octave = 0
         #print "velo",velo_, velo_abs
-        print hand, finger_num, index_2.y, index_5.y, velo_abs, octave#ndex_5.y, index_2.y#, 
-        
         #print hand, finger_num, velo_abs, index_2.y
         #print frame.hands.leftmost.palm_position
         #print distance_to_palm_1, distance_to_palm_2
-        pitch = pitchs_dic[hand + str(finger_num)]+str(octave)
+        pitch = pitchs_dic[hand + str(finger_num)]+str(int(octave))
+        print hand, finger_num, pitch#ndex_5.y, index_2.y#, 
         create_note(midiout, pitch, delta_t, velo_abs)
 
 
